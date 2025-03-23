@@ -12,13 +12,13 @@
 
     button {
         color: var(--color-text, #333333);
-        fill: var(--color-icon, #333333);
-        border-radius: 2px;
+        background-color: var(--color-button, #ffffff);
         cursor: default;
         box-sizing: border-box;
         background-clip: padding-box;
-        height: 28px;
-        border: 1px solid transparent;
+        border: 1px solid var(--color-border, #cccccc);
+        border-radius: 3px;
+        padding: 30 10px;
         font: inherit;
         outline: none;
         letter-spacing: inherit;
@@ -26,6 +26,14 @@
         display: block;
         width: 100%;
         font-size: 14px;
+    }
+    
+    button:hover {
+        background-color: var(--color-button-hover, #f0f0f0);
+    }
+    
+    button:active {
+        background-color: var(--color-button-active, #e0e0e0);
     }
 
     .pad {
@@ -40,23 +48,8 @@
 
 <div>
     <p class="pad">
-        <button id="sync-up">Sync Up</button>
-        <button id="unsync" class="is-hidden">Syncing...</button>
+        <button id="downloadcsv">Download CSV</button>
     </p>
-    <p>
-        Personal Access Token
-        <input id="input-pat" type="password"></input>
-    </p>
-
-    <p>
-        BaseID
-        <input id="input-baseid" type="password"></input>
-    </p>
-
-    <div class="box">
-        <p>Table <input class="input__field" id="input-tableid"></input></p>
-    </div>
-
 </div>
 
 
@@ -66,50 +59,37 @@
     const debug = false;
     const debugLog = (message) => debug ? console.log(`plugin script: ${message}`) : null;
 
-    let isSyncing = false
+    const downloadAsCSV = (data) => {
+        // Ensure a header is included in the CSV
+        // Extract all unique keys from data to create header
+        debugLog(JSON.stringify(data))
+        let headers = new Set();
+        data.forEach(item => {
+            headers = headers.union(new Set(Object.keys(item)));
+        });
 
-    // Initiate the figma > airtable sync
-    const syncButton = document.getElementById('sync-up');
-    syncButton.addEventListener('click', function () {
-        const pat = document.getElementById('input-pat').value;
-        const baseId = document.getElementById('input-baseid').value;
-        const tableId = document.getElementById('input-tableid').value;
+        const header = Array.from(headers);
 
-        parent.postMessage({
-            pluginMessage: {
-                type: 'sync',
-                data: {
-                    pat: pat,
-                    baseId: baseId,
-                    tableId: tableId
-                }
-            },
-        }, '*');
-        // after this the plugin should be watching changes and upserting them to airtable
-        isSyncing = true
-        toggleSyncButton()
-    });
-
-    const unsyncButton = document.getElementById('unsync');
-    unsyncButton.addEventListener('click', function () {
-        parent.postMessage({
-            pluginMessage: {
-                type: 'unsync',
-            },
-        }, '*');
-        isSyncing = false
-        toggleSyncButton()
-    });
-
-    function toggleSyncButton() {
-        if (isSyncing) {
-            document.getElementById('unsync').classList.remove('is-hidden')
-            document.getElementById('sync-up').classList.add('is-hidden')
-        } else {
-            document.getElementById('unsync').classList.add('is-hidden')
-            document.getElementById('sync-up').classList.remove('is-hidden')
-        }
+        const dataSet = data.map(row => header.map(key => row[key] || '').join(',')).join('\n');
+        const csvContent = "data:text/csv;charset=utf-8," + header.join(',') + '\n' + dataSet;
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "my_data.csv");
+        document.body.appendChild(link); // Required for FF
+        link.click();
     }
+
+    // download as csv button
+    const downloadCSVButton = document.getElementById('downloadcsv');
+    downloadCSVButton.addEventListener('click', function () {
+        debugLog('post')
+        parent.postMessage({
+            pluginMessage: {
+                type: 'download-csv',
+            },
+        }, '*');
+    });
 
     // handle messages coming from the plugin
     onmessage = async (event) => {
@@ -123,11 +103,10 @@
                     debugLog('error')
                     console.log(`error ${event.data.pluginMessage.pluginMessage.data}`)
                     break;
-                case 'credentials':
-                    debugLog('credentials')
-                    document.getElementById('input-pat').value = event.data.pluginMessage.pluginMessage.data.pat;
-                    document.getElementById('input-baseid').value = event.data.pluginMessage.pluginMessage.data.baseId;
-                    document.getElementById('input-tableid').value = event.data.pluginMessage.pluginMessage.data.tableId;
+                case 'download-csv':
+                    debugLog('download-csv')
+                    const data = event.data.pluginMessage.pluginMessage.data;
+                    downloadAsCSV(data)
                     break;
                 default:
                     debugLog('untyped')

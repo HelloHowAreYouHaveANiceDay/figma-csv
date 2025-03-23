@@ -5,7 +5,7 @@
 
 
 // shitty debug logging
-const debug = false;
+const debug = true;
 const debugLog = (message: any) => debug ? console.log(`plugin script: ${message}`) : null;
 
 debugLog("start");
@@ -44,8 +44,25 @@ function sendUiMessage(msg: string) {
 }
 
 /**
- * Store airtable credentials in client storage
  * 
+ * @param data - data to send to ui
+ */
+function sendUiDownloadCSV(data: any) {
+  figma.ui.postMessage({
+    pluginMessage: {
+      type: "download-csv",
+      data: data,
+    },
+  });
+}
+
+
+/**
+ *  AIRTABLE START
+ */
+
+/** TODO: Remove
+ * Store airtable credentials in client storage
  * @param pat - personal access token
  * @param baseId - base id
  * @param tableId - table id
@@ -64,7 +81,7 @@ const storeCredentials = async (pat: string, baseId: string, tableId: string,) =
   }
 }
 
-/**
+/** TODO: REMOVE
  * NOTE: NOT SECURE
  * gets credentials from client storage
  * 
@@ -106,32 +123,39 @@ figma.ui.onmessage = async (msg) => {
   debugLog(msg);
 
   switch (msg.type) {
-    case 'sync':
-      console.log(msg);
-      await storeCredentials(msg.data.pat, msg.data.baseId, msg.data.tableId);
-      upsertToTable = upsert(msg.data.pat, msg.data.baseId, msg.data.tableId);
-      // Start Sync
-      //  - get all nodes
-      //  - upsert to airtable
-      await initialUpsert(upsertToTable);
+    // case 'sync':
+    //   console.log(msg);
+    //   await storeCredentials(msg.data.pat, msg.data.baseId, msg.data.tableId);
+    //   upsertToTable = upsert(msg.data.pat, msg.data.baseId, msg.data.tableId);
+    //   // Start Sync
+    //   //  - get all nodes
+    //   //  - upsert to airtable
+    //   await initialUpsert(upsertToTable);
 
-      // Syncing
-      //  - on node chage
-      isSyncing = true;
-      // watches changes and upserts changed nodes
-      figma.on("documentchange", upsertOnChange);
-      //  - upsert to airtable
-      figma.ui.postMessage({
-        pluginMessage: {
-          type: 'message',
-          data: 'syncing with airtable'
-        }
-      });
+    //   // Syncing
+    //   //  - on node chage
+    //   isSyncing = true;
+    //   // watches changes and upserts changed nodes
+    //   figma.on("documentchange", upsertOnChange);
+    //   //  - upsert to airtable
+    //   figma.ui.postMessage({
+    //     pluginMessage: {
+    //       type: 'message',
+    //       data: 'syncing with airtable'
+    //     }
+    //   });
+    //   break;
+    // case 'unsync':
+    //   debugLog('unsyncing')
+    //   isSyncing = false;
+    //   figma.off("documentchange", upsertOnChange);
+    case 'download-csv':
+      // data request from ui
+      debugLog('data request')
+      const nodes = await getAllSceneNodes()
+      const data = nodes.map(mapNodeToRecord);
+      sendUiDownloadCSV(data);
       break;
-    case 'unsync':
-      debugLog('unsyncing')
-      isSyncing = false;
-      figma.off("documentchange", upsertOnChange);
     case 'initialize':
       await initialize();
       break;
@@ -142,41 +166,53 @@ figma.ui.onmessage = async (msg) => {
 
 
 
-function upsertOnChange(event: DocumentChangeEvent) {
-  debugLog(event.documentChanges)
-  if(!isSyncing) return;
-  event.documentChanges
-    .map((r) => [r.id, r.type])
-    .forEach(([id, key]) => {
-      switch (key) {
-        case 'PROPERTY_CHANGE':
-          // get node by id
-          const node = figma.currentPage.findOne((n) => n.id === id);
-          // upsert
-          //@ts-ignore - node should exist if we get a change
-          upsertToTable([mapNodeToRecord(node)])
-          break;
+// function upsertOnChange(event: DocumentChangeEvent) {
+//   debugLog(event.documentChanges)
+//   if(!isSyncing) return;
+//   event.documentChanges
+//     .map((r) => [r.id, r.type])
+//     .forEach(([id, key]) => {
+//       switch (key) {
+//         case 'PROPERTY_CHANGE':
+//           // get node by id
+//           const node = figma.currentPage.findOne((n) => n.id === id);
+//           // upsert
+//           //@ts-ignore - node should exist if we get a change
+//           upsertToTable([mapNodeToRecord(node)])
+//           break;
 
-        case 'DELETE':
-          //@ts-ignore
-          const withStatus = {
-            fields: {
-              'figma_id': id,
-              'sync_status': 'deleted'
-            }
-          }
-          upsertToTable([withStatus])
-          break;
-        // case 'CREATE':
-        // create is always followed by a property change
-        //   break;
-        default:
-          break;
-      }
-      console.log("document change");
-    });
+//         case 'DELETE':
+//           //@ts-ignore
+//           const withStatus = {
+//             fields: {
+//               'figma_id': id,
+//               'sync_status': 'deleted'
+//             }
+//           }
+//           upsertToTable([withStatus])
+//           break;
+//         // case 'CREATE':
+//         // create is always followed by a property change
+//         //   break;
+//         default:
+//           break;
+//       }
+//       console.log("document change");
+//     });
+// }
+
+async function getAllSceneNodes() {
+  let nodes: SceneNode[] = [];
+  const allNodes: SceneNode[] = [];
+
+  debugLog("getting nodes")
+  nodes = figma.currentPage.children.map((n) => n);
+  getAllChildNodes(nodes, allNodes);
+  debugLog(allNodes.length)
+  debugLog("got nodes")
+
+  return allNodes;
 }
-
 
 async function initialUpsert(upsert: Function) {
   let nodes: SceneNode[] = [];
@@ -200,7 +236,6 @@ async function initialUpsert(upsert: Function) {
 function mapNodeToRecord(node: SceneNode) {
   debugLog(`mapping ${node}`)
   return ({
-    fields: {
       figma_id: node.id,
       name: node.name,
       type: node.type,
@@ -209,8 +244,7 @@ function mapNodeToRecord(node: SceneNode) {
       width: node.width,
       height: node.height,
       sync_status: "active",
-    }
-  })
+    })
 }
 
 // return a function that accepts a an array of records
@@ -254,8 +288,6 @@ function upsert(pat: string, baseId: string, tableId: string) {
 
   }
 }
-
-
 
 
 
