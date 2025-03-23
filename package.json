@@ -12,7 +12,7 @@
   "license": "",
   "devDependencies": {
     "@figma/plugin-typings": "^1.62.0",
-    "typescript": "*"
+    "typescript": "^5.8.2"
   },
   "dependencies": {
     "figma-plugin-ds": "^1.0.1"
