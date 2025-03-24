@@ -57,21 +57,38 @@
 <script>
     // shitty debug logging
     const debug = false;
-    const debugLog = (message) => debug ? console.log(`plugin script: ${message}`) : null;
+    const debugLog = (message) => debug ? console.log(`ui script: ${message}`) : null;
 
     const downloadAsCSV = (data) => {
         // Ensure a header is included in the CSV
         // Extract all unique keys from data to create header
-        debugLog(JSON.stringify(data))
-        let headers = new Set();
-        data.forEach(item => {
-            headers = headers.union(new Set(Object.keys(item)));
-        });
+        // debugLog(JSON.stringify(data))
+        const parse = JSON.parse(data)
+        const content = parse.csv
+        debugLog(content)
+        // let headers = new Set();
+        // content.forEach(item => {
+        //     Object.keys(item).forEach(key => headers.add(key));
+        // });
 
-        const header = Array.from(headers);
-
-        const dataSet = data.map(row => header.map(key => row[key] || '').join(',')).join('\n');
-        const csvContent = "data:text/csv;charset=utf-8," + header.join(',') + '\n' + dataSet;
+        // const header = Array.from(headers);
+        
+        // Function to properly escape CSV values
+        // const escapeCSV = (value) => {
+        //     if (value === null || value === undefined) return '';
+        //     value = String(value);
+        //     // If value contains comma, newline, or double-quote, wrap in double quotes
+        //     if (value.includes(',') || value.includes('\n') || value.includes('"')) {
+        //         // Double any existing quotes
+        //         return '"' + value.replace(/"/g, '""') + '"';
+        //     }
+        //     return value;
+        // };
+        
+        // const headerRow = header.map(escapeCSV).join(',');
+        // const dataRows = content.map(row => header.map(key => escapeCSV(row[key])).join(',')).join('\n');
+        // const csvContent = "data:text/csv;charset=utf-8," + headerRow + '\n' + dataRows;
+        const csvContent = "data:text/csv;charset=utf-8," + content;
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);

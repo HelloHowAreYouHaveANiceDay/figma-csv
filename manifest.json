@@ -2,7 +2,7 @@
   "name": "figma-csv",
   "id": "1485654783569143571",
   "api": "1.0.0",
-  "main": "code.js",
+  "main": "dist/code.js",
   "ui": "ui.html",
   "capabilities": [],
   "enableProposedApi": false,
